@@ -17,18 +17,14 @@ RUN curl -fsSLO "$SUPERCRONIC_URL" \
     && mv "$SUPERCRONIC" "/usr/local/bin/${SUPERCRONIC}" \
     && ln -s "/usr/local/bin/${SUPERCRONIC}" /usr/local/bin/supercronic
 
-# Set build arguments with defaults for scheduling
-ARG START_SCHEDULE="0 8 * * *"
-ARG STOP_SCHEDULE="0 18 * * *"
-
-# Copy scripts
+# Copy scripts and schedule file
+RUN mkdir -p /app
 COPY railway.sh /usr/local/bin/railway.sh
 COPY startup.sh /startup.sh
+COPY schedules.conf /app/schedules.conf
 RUN chmod +x /usr/local/bin/railway.sh /startup.sh
 
-# Create crontab file for supercronic
-RUN mkdir -p /app && \
-    echo "$START_SCHEDULE /usr/local/bin/railway.sh start" > /app/crontab && \
-    echo "$STOP_SCHEDULE /usr/local/bin/railway.sh stop" >> /app/crontab
+# Path of the schedule file (override to read from a mounted volume)
+ENV SCHEDULE_FILE=/app/schedules.conf
 
 CMD ["/startup.sh"]

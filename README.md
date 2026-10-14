@@ -15,7 +15,7 @@ A Railway template that automatically starts and stops your Railway services on 
 ## 📋 Requirements
 
 - **Railway Account Token**: Personal or Team token (not Project token)
-- **Service IDs**: Comma-separated list of Railway service IDs to manage
+- **Schedule file**: `schedules.conf` listing each service ID with its own start and stop schedule
 - **Railway Project**: This service must be deployed in the same project as the services you want to manage
 
 ## 🎯 Quick Deploy
@@ -26,41 +26,46 @@ A Railway template that automatically starts and stops your Railway services on 
 
 When deploying, you'll need to provide:
 
-| Variable                | Description                                          | Required                                  |
-| ----------------------- | ---------------------------------------------------- | ----------------------------------------- |
-| `RAILWAY_ACCOUNT_TOKEN` | Your Railway personal/team API token                 | ✅                                        |
-| `SERVICES_ID`           | Comma-separated Railway service IDs                  | ✅                                        |
-| `TZ`                    | Timezone (e.g., `America/New_York`, `Europe/London`) | ❌ (defaults to `UTC`)                     |
-| `START_SCHEDULE`        | Cron expression for starting services                | ❌ (defaults to `0 8 * * *` - 8 AM daily)  |
-| `STOP_SCHEDULE`         | Cron expression for stopping services                | ❌ (defaults to `0 18 * * *` - 6 PM daily) |
+| Variable                | Description                                                     | Required                                       |
+| ----------------------- | --------------------------------------------------------------- | ---------------------------------------------- |
+| `RAILWAY_ACCOUNT_TOKEN` | Your Railway personal/team API token                            | ✅                                             |
+| `TZ`                    | Timezone (e.g., `America/Recife`, `Europe/London`)              | ❌ (defaults to `UTC`)                          |
+| `SCHEDULE_FILE`         | Path of the schedule file inside the container                  | ❌ (defaults to `/app/schedules.conf`)          |
 
-## 🔧 Configuration Examples
+Services and schedules are no longer environment variables. They are read from `schedules.conf`, which is copied into the image at build time.
 
-### Default Schedule (8 AM - 6 PM UTC daily)
+## 📄 Schedule File
 
-```bash
-RAILWAY_ACCOUNT_TOKEN=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
-SERVICES_ID=service-id-1,service-id-2,service-id-3
+One service per line, with three columns: `SERVICE_ID`, `START_SCHEDULE` and `STOP_SCHEDULE`. Each schedule is a standard 5-field cron expression. Columns can be separated by spaces or tabs.
+
+```
+SERVICE_ID	START_SCHEDULE	STOP_SCHEDULE
+7e86edec-28fd-4b9a-b868-63f3ee0845fd	0 6 * * 1-5	30 22 * * 1-5
+f3ec94d9-1ab8-492d-ad04-c6557816cc26	0 7 * * 1-5	00 22 * * 1-5
+e8ba2c2c-9f1e-4edc-aea4-868aa0133dd4	0 8 * * 1-5	00 20 * * 1-5
 ```
 
-### Custom Schedule (9 AM - 5 PM EST, weekdays only)
+- Blank lines, lines starting with `#` and the `SERVICE_ID` header line are ignored.
+- Each service gets its own start and stop time.
+- If any line is invalid (wrong number of fields or malformed ID), the container logs the line number and exits instead of running with a partial schedule.
+- To change the schedule, edit `schedules.conf` and redeploy.
+
+## 🔧 Configuration Example
+
+Environment variables (Railway service settings):
 
 ```bash
 RAILWAY_ACCOUNT_TOKEN=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
-SERVICES_ID=service-id-1,service-id-2
-TZ=America/New_York
-START_SCHEDULE="0 9 * * 1-5"
-STOP_SCHEDULE="0 17 * * 1-5"
+TZ=America/Recife
 ```
 
-### Weekend Schedule (10 AM - 2 PM, weekends only)
+`schedules.conf` (weekdays only, different hours per service):
 
-```bash
-RAILWAY_ACCOUNT_TOKEN=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
-SERVICES_ID=service-id-1
-TZ=Europe/London
-START_SCHEDULE="0 10 * * 6,0"
-STOP_SCHEDULE="0 14 * * 6,0"
+```
+SERVICE_ID	START_SCHEDULE	STOP_SCHEDULE
+service-id-1	0 6 * * 1-5	30 22 * * 1-5
+service-id-2	0 9 * * 1-5	0 17 * * 1-5
+service-id-3	0 10 * * 6,0	0 14 * * 6,0
 ```
 
 ## 🔑 Getting Your Railway Token
@@ -76,7 +81,7 @@ STOP_SCHEDULE="0 14 * * 6,0"
 1. Go to your Railway project
 2. Click on each service you want to manage
 3. Copy the service ID from the URL or service settings
-4. Combine them with commas: `service-1-id,service-2-id,service-3-id`
+4. Add one line per service to `schedules.conf`
 
 ## 📅 Cron Expression Reference
 
@@ -99,7 +104,7 @@ STOP_SCHEDULE="0 14 * * 6,0"
 
 ### Service Not Starting/Stopping
 - Verify your `RAILWAY_ACCOUNT_TOKEN` has proper permissions
-- Ensure `SERVICES_ID` contains valid Railway service IDs
+- Ensure the IDs in `schedules.conf` are valid Railway service IDs
 - Check that services exist in the same project
 
 ### Cron Not Running
@@ -113,10 +118,10 @@ STOP_SCHEDULE="0 14 * * 6,0"
 
 ## 🏗️ How It Works
 
-1. **Container starts** and validates configuration
+1. **Container starts**, reads `schedules.conf` and generates the crontab (two entries per service)
 2. **Supercronic** runs in the background with your schedules
-3. **Start schedule** runs the script with `start` argument
-4. **Stop schedule** runs the script with `stop` argument
+3. **Start schedule** runs `railway.sh start <service_id>`
+4. **Stop schedule** runs `railway.sh stop <service_id>`
 5. **Script checks** current service status before taking action
 6. **All output** is logged to Railway dashboard for monitoring
 

@@ -1,8 +1,12 @@
 #!/bin/bash
 
-# Validate SERVICES_ID is provided
-if [ -z "$SERVICES_ID" ]; then
-  echo "Error: SERVICES_ID environment variable is required"
+# Usage: railway.sh [start|stop] <service_id>
+ACTION="$1"
+SERVICE_ID="$2"
+
+if [ -z "$SERVICE_ID" ]; then
+  echo "Error: service id is required"
+  echo "Usage: $0 [start|stop] <service_id>"
   exit 1
 fi
 
@@ -125,26 +129,18 @@ echo "✅ Token valid - connected to project: $project_name"
 echo ""
 
 # Execute intent
-case "$1" in
+case "$ACTION" in
     "start")
-        echo "=== Bringing Services UP ==="
-        IFS=',' read -ra SERVICE_ARRAY <<< "$SERVICES_ID"
-        for service in "${SERVICE_ARRAY[@]}"; do
-            service=$(echo "$service" | xargs)
-            deploy_service "$service"
-        done
+        echo "=== Bringing Service UP ==="
+        deploy_service "$SERVICE_ID"
         ;;
     "stop")
-        echo "=== Bringing Services DOWN ==="
-        IFS=',' read -ra SERVICE_ARRAY <<< "$SERVICES_ID"
-        for service in "${SERVICE_ARRAY[@]}"; do
-            service=$(echo "$service" | xargs)
-            shutdown_service "$service"
-        done
+        echo "=== Bringing Service DOWN ==="
+        shutdown_service "$SERVICE_ID"
         ;;
     *)
-        echo "Error: Invalid argument '$1'"
-        echo "Usage: $0 [start|stop]"
+        echo "Error: Invalid argument '$ACTION'"
+        echo "Usage: $0 [start|stop] <service_id>"
         exit 1
         ;;
 esac
